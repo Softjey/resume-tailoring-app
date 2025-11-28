@@ -40,6 +40,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy node_modules to ensure all theme assets are available
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
 # Create tmp directory for the runner stage
 RUN mkdir -p tmp && chown nextjs:nodejs tmp
 

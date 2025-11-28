@@ -24,17 +24,13 @@ export const themes = [
   "modern-extended",
   "rnord",
   "light-classy-responsive",
-  "simplyelegant",
   "projects",
-  "msresume",
   "dark-classy-responsive",
   "onepage",
   "slick",
-  "rocketspacer",
   "direct",
   "compact",
   "clean",
-  "actual",
 ];
 
 // Helper to recursively decode HTML entities in strings
@@ -128,14 +124,8 @@ export async function renderTheme(themeName: string, resume: any) {
       case "light-classy-responsive":
         themeModule = await import("jsonresume-theme-light-classy-responsive");
         break;
-      case "simplyelegant":
-        themeModule = await import("jsonresume-theme-simplyelegant");
-        break;
       case "projects":
         themeModule = await import("jsonresume-theme-projects");
-        break;
-      case "msresume":
-        themeModule = await import("jsonresume-theme-msresume");
         break;
       case "dark-classy-responsive":
         themeModule = await import("jsonresume-theme-dark-classy-responsive");
@@ -146,9 +136,6 @@ export async function renderTheme(themeName: string, resume: any) {
       case "slick":
         themeModule = await import("jsonresume-theme-slick");
         break;
-      case "rocketspacer":
-        themeModule = await import("jsonresume-theme-rocketspacer");
-        break;
       case "direct":
         themeModule = await import("jsonresume-theme-direct");
         break;
@@ -157,9 +144,6 @@ export async function renderTheme(themeName: string, resume: any) {
         break;
       case "clean":
         themeModule = await import("jsonresume-theme-clean");
-        break;
-      case "actual":
-        themeModule = await import("jsonresume-theme-actual");
         break;
       default:
         throw new Error(`Unknown theme: ${themeName}`);

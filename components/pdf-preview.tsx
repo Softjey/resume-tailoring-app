@@ -56,23 +56,22 @@ export function PDFPreview({ pdfUrl }: PDFPreviewProps) {
         </div>
       )}
 
-      <div
+            <div 
         style={{
-          width: "794px", // A4 width
-          height: "1123px", // A4 height
+          width: '794px', // A4 width
+          height: '1123px', // A4 height
           transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          backgroundColor: "white",
-          boxShadow:
-            "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+          transformOrigin: 'top left',
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         }}
       >
-        <iframe
-          src={pdfUrl}
-          className="w-full h-full border-0"
+        <iframe 
+          src={pdfUrl} 
+          className="w-full h-full border-0" 
           title="Resume Preview"
           onLoad={handleLoad}
-          style={{ pointerEvents: "none" }} // Disable interaction for better preview experience
+          style={{ pointerEvents: 'none', colorScheme: 'light' }} // Disable interaction and force light scheme
         />
       </div>
     </div>

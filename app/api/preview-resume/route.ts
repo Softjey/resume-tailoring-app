@@ -26,15 +26,33 @@ export async function GET(request: NextRequest) {
 
     const html = await renderTheme(theme, resume);
 
-    // Inject minimal CSS to ensure desktop layout
+    // Inject minimal CSS to ensure desktop layout and force light mode
     const styleInjection = `
+      <meta name="color-scheme" content="light">
       <style>
-        html, body {
+        :root {
+          color-scheme: light;
+        }
+        html {
+          background: white !important;
+          color-scheme: light !important;
+        }
+        body {
           margin: 0;
           padding: 0;
           width: 100%;
           min-width: 794px; /* Force desktop width */
-          background: white;
+          background-color: white !important;
+          color: #333 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        /* Override common dark mode media queries if color-scheme doesn't work */
+        @media (prefers-color-scheme: dark) {
+          body {
+            background-color: white !important;
+            color: #333 !important;
+          }
         }
         /* Hide scrollbars in preview */
         ::-webkit-scrollbar {

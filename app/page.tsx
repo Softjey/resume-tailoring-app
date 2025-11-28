@@ -690,7 +690,7 @@ function FormView({
                     onChangeJobDescription(event.target.value)
                   }
                   placeholder="Paste the job posting or recruiter notes here..."
-                  className="min-h-[220px] resize-y border-white/10 bg-black/20 text-white placeholder:text-white/40"
+                  className="min-h-[220px] max-h-[400px] resize-y border-white/10 bg-black/20 text-white placeholder:text-white/40"
                 />
               </div>
 

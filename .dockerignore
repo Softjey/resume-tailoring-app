@@ -1,0 +1,51 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Production builds
+.next
+out
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+
+# Miscellaneous
+.DS_Store
+*.tgz
+*.tar.gz
+
+# Debug
+lerna-debug.log*
+
+# Local env files
+.env*.local
+
+# Vercel
+.vercel
+
+# IDE
+.vscode
+.idea
+
+# Git
+.git
+.gitignore
+README.md
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Temporary files
+tmp/*
+!tmp/.gitkeep

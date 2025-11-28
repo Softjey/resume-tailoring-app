@@ -126,7 +126,7 @@ export default function Home() {
   );
   const [downloadingTheme, setDownloadingTheme] = useState<string | null>(null);
 
-  const rafRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
   const cancelTimelineRef = useRef(false);
   const accelerateTimelineRef = useRef(false);
   const completionChimePlayedRef = useRef(false);
@@ -200,6 +200,13 @@ export default function Home() {
     setResumeFile(file);
   };
 
+  const clearAnimationInterval = () => {
+    if (intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
   const resetProgress = () => {
     setProgressState(createInitialProgressState());
     setTimelineDone(false);
@@ -207,6 +214,7 @@ export default function Home() {
     cancelTimelineRef.current = false;
     accelerateTimelineRef.current = false;
     completionChimePlayedRef.current = false;
+    clearAnimationInterval();
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -312,10 +320,7 @@ export default function Home() {
   useEffect(() => {
     if (stage !== "loading") {
       cancelTimelineRef.current = true;
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+      clearAnimationInterval();
       return;
     }
 
@@ -335,13 +340,14 @@ export default function Home() {
           const stepPortion = 100 / totalSteps;
           const quickDuration = step.acceleratedDuration ?? 2200;
 
-          const tick = (now: number) => {
+          const tick = () => {
             if (cancelTimelineRef.current) {
+              clearAnimationInterval();
               resolve();
               return;
             }
 
-            const elapsed = now - start;
+            const elapsed = performance.now() - start;
             const targetDuration = accelerateTimelineRef.current
               ? quickDuration
               : step.duration;
@@ -355,9 +361,8 @@ export default function Home() {
               completedIds: prev.completedIds,
             }));
 
-            if (ratio < 1) {
-              rafRef.current = requestAnimationFrame(tick);
-            } else {
+            if (ratio >= 1) {
+              clearAnimationInterval();
               setProgressState((prev) => ({
                 progress: index === totalSteps - 1 ? 100 : computed,
                 activeStepId: step.id,
@@ -369,7 +374,8 @@ export default function Home() {
             }
           };
 
-          rafRef.current = requestAnimationFrame(tick);
+          tick();
+          intervalRef.current = window.setInterval(tick, 200);
         });
 
         if (cancelTimelineRef.current) return;
@@ -382,10 +388,7 @@ export default function Home() {
 
     return () => {
       cancelTimelineRef.current = true;
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+      clearAnimationInterval();
     };
   }, [stage]);
 

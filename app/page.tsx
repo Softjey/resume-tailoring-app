@@ -1,154 +1,170 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Upload, Sparkles, Download, FileText, Loader2, Wand2, Stars, ArrowRight } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { PDFPreview } from "@/components/pdf-preview"
-import { ProgressModal } from "@/components/progress-modal"
+import { useState } from "react";
+import {
+  Upload,
+  Sparkles,
+  Download,
+  FileText,
+  Loader2,
+  Wand2,
+  Stars,
+  ArrowRight,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { PDFPreview } from "@/components/pdf-preview";
+import { ProgressModal } from "@/components/progress-modal";
 
 interface GeneratedResume {
-  theme: string
-  pdfUrl: string
-  label: string
-  id: string
+  theme: string;
+  pdfUrl: string;
+  label: string;
+  id: string;
 }
 
 export default function Home() {
-  const [jobDescription, setJobDescription] = useState("")
-  const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [useMock, setUseMock] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [generatedResumes, setGeneratedResumes] = useState<GeneratedResume[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const { toast } = useToast()
+  const [jobDescription, setJobDescription] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [useMock, setUseMock] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [generatedResumes, setGeneratedResumes] = useState<GeneratedResume[]>(
+    []
+  );
+  const [showForm, setShowForm] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
       if (file.type !== "application/pdf") {
         toast({
           title: "Invalid file type",
           description: "Please upload a PDF file",
           variant: "destructive",
-        })
-        return
+        });
+        return;
       }
-      setResumeFile(file)
+      setResumeFile(file);
       toast({
         title: "File uploaded",
         description: file.name,
-      })
+      });
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!useMock) {
-        if (!resumeFile) {
+      if (!resumeFile) {
         toast({
-            title: "Missing file",
-            description: "Please upload your resume",
-            variant: "destructive",
-        })
-        return
-        }
+          title: "Missing file",
+          description: "Please upload your resume",
+          variant: "destructive",
+        });
+        return;
+      }
 
-        if (!jobDescription.trim()) {
+      if (!jobDescription.trim()) {
         toast({
-            title: "Missing information",
-            description: "Please enter a job description",
-            variant: "destructive",
-        })
-        return
-        }
+          title: "Missing information",
+          description: "Please enter a job description",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
-    setIsLoading(true)
-    setGeneratedResumes([])
+    setIsLoading(true);
+    setGeneratedResumes([]);
 
     try {
-      const formData = new FormData()
-      formData.append("jobDescription", jobDescription)
+      const formData = new FormData();
+      formData.append("jobDescription", jobDescription);
       if (resumeFile) {
-        formData.append("resume", resumeFile)
+        formData.append("resume", resumeFile);
       }
-      formData.append("useMock", String(useMock))
+      formData.append("useMock", String(useMock));
 
-      console.log('Sending tailor resume request')
+      console.log("Sending tailor resume request");
       const response = await fetch("/api/tailor-resume", {
         method: "POST",
         body: formData,
-      })
+      });
 
       if (!response.ok) {
-        console.log('Tailor resume error')
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        console.log("Tailor resume error");
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
         console.log(errorData);
-        throw new Error(errorData.error || "Failed to process resume")
+        throw new Error(errorData.error || "Failed to process resume");
       }
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success && data.resumes) {
-        setGeneratedResumes(data.resumes)
+        setGeneratedResumes(data.resumes);
         toast({
           title: "Success!",
           description: "Your resume has been tailored in multiple themes",
-        })
+        });
       } else {
-        throw new Error(data.error || "Failed to generate resumes")
+        throw new Error(data.error || "Failed to generate resumes");
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to process resume",
+        description:
+          error instanceof Error ? error.message : "Failed to process resume",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleDownload = async (theme: string, id: string) => {
     try {
-      const response = await fetch(`/api/download-resume?theme=${theme}&id=${id}`)
+      const response = await fetch(
+        `/api/download-resume?theme=${theme}&id=${id}`
+      );
 
       if (!response.ok) {
-        throw new Error("Failed to download resume")
+        throw new Error("Failed to download resume");
       }
 
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `resume-${theme}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume-${theme}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
       toast({
         title: "Downloaded!",
         description: `Resume downloaded in ${theme} theme`,
-      })
+      });
     } catch (error) {
-      console.error("[v0] Download error:", error)
+      console.error("[v0] Download error:", error);
       toast({
         title: "Error",
         description: "Failed to download resume",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 relative overflow-hidden">
@@ -170,7 +186,9 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">ResumeForge</h1>
-              <p className="text-xs text-muted-foreground">AI-powered resume magic</p>
+              <p className="text-xs text-muted-foreground">
+                AI-powered resume magic
+              </p>
             </div>
           </div>
           <ThemeToggle />
@@ -195,8 +213,9 @@ export default function Home() {
               </h1>
 
               <p className="text-xl md:text-2xl text-muted-foreground text-balance max-w-3xl mx-auto leading-relaxed">
-                Upload your resume, paste any job description, and watch as our AI tailors your resume perfectly. Get
-                multiple professional themes in seconds.
+                Upload your resume, paste any job description, and watch as our
+                AI tailors your resume perfectly. Get multiple professional
+                themes in seconds.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-8">
@@ -220,7 +239,8 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-lg">AI-Powered</h3>
                   <p className="text-sm text-muted-foreground">
-                    Advanced AI analyzes and tailors your resume to match job requirements perfectly
+                    Advanced AI analyzes and tailors your resume to match job
+                    requirements perfectly
                   </p>
                 </CardContent>
               </Card>
@@ -232,7 +252,8 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-lg">Multiple Themes</h3>
                   <p className="text-sm text-muted-foreground">
-                    Choose from professional, elegant, and flat designs to match your style
+                    Choose from professional, elegant, and flat designs to match
+                    your style
                   </p>
                 </CardContent>
               </Card>
@@ -244,7 +265,8 @@ export default function Home() {
                   </div>
                   <h3 className="font-semibold text-lg">Instant Download</h3>
                   <p className="text-sm text-muted-foreground">
-                    Get your tailored resume in seconds, ready to submit to employers
+                    Get your tailored resume in seconds, ready to submit to
+                    employers
                   </p>
                 </CardContent>
               </Card>
@@ -253,7 +275,12 @@ export default function Home() {
         ) : (
           <>
             <div className="text-center mb-12 space-y-4">
-              <Button onClick={() => setShowForm(false)} variant="ghost" size="sm" className="mb-4">
+              <Button
+                onClick={() => setShowForm(false)}
+                variant="ghost"
+                size="sm"
+                className="mb-4"
+              >
                 ← Back to Home
               </Button>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
@@ -268,7 +295,8 @@ export default function Home() {
                 </span>
               </h2>
               <p className="text-lg text-muted-foreground text-balance max-w-2xl mx-auto">
-                Upload your resume first, then paste the job description. Our AI will tailor it perfectly.
+                Upload your resume first, then paste the job description. Our AI
+                will tailor it perfectly.
               </p>
             </div>
 
@@ -276,19 +304,30 @@ export default function Home() {
               <CardContent className="p-6 md:p-8">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <label htmlFor="resume" className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <label
+                      htmlFor="resume"
+                      className="text-sm font-medium text-foreground flex items-center gap-2"
+                    >
                       <FileText className="size-4" />
                       Your Resume (PDF)
                     </label>
                     <div className="relative">
-                      <input type="file" id="resume" accept=".pdf" onChange={handleFileChange} className="sr-only" />
+                      <input
+                        type="file"
+                        id="resume"
+                        accept=".pdf"
+                        onChange={handleFileChange}
+                        className="sr-only"
+                      />
                       <label
                         htmlFor="resume"
                         className="flex items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors bg-background/50 hover:bg-accent/5"
                       >
                         <Upload className="size-5 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground">
-                          {resumeFile ? resumeFile.name : "Click to upload or drag and drop"}
+                          {resumeFile
+                            ? resumeFile.name
+                            : "Click to upload or drag and drop"}
                         </span>
                       </label>
                     </div>
@@ -312,10 +351,12 @@ export default function Home() {
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="useMock" 
-                        checked={useMock} 
-                        onCheckedChange={(checked) => setUseMock(checked as boolean)} 
+                    <Checkbox
+                      id="useMock"
+                      checked={useMock}
+                      onCheckedChange={(checked) =>
+                        setUseMock(checked as boolean)
+                      }
                     />
                     <Label htmlFor="useMock">Use Mock Data (Dev Only)</Label>
                   </div>
@@ -344,19 +385,34 @@ export default function Home() {
             {generatedResumes.length > 0 && (
               <div className="mt-12 space-y-6">
                 <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-bold text-foreground">Your Tailored Resumes</h3>
-                  <p className="text-muted-foreground">Select your favorite theme and download</p>
+                  <h3 className="text-2xl font-bold text-foreground">
+                    Your Tailored Resumes
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Select your favorite theme and download
+                  </p>
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-6">
                   {generatedResumes.map((resume) => (
-                    <Card key={resume.theme} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    <Card
+                      key={resume.theme}
+                      className="overflow-hidden hover:shadow-lg transition-shadow"
+                    >
                       <div className="h-[400px] w-full bg-muted relative overflow-hidden">
                         <PDFPreview pdfUrl={resume.pdfUrl} />
                       </div>
                       <CardContent className="p-4 space-y-3">
-                        <h4 className="font-semibold text-lg capitalize text-foreground">{resume.label}</h4>
-                        <Button onClick={() => handleDownload(resume.theme, resume.id)} className="w-full" variant="outline">
+                        <h4 className="font-semibold text-lg capitalize text-foreground">
+                          {resume.label}
+                        </h4>
+                        <Button
+                          onClick={() =>
+                            handleDownload(resume.theme, resume.id)
+                          }
+                          className="w-full"
+                          variant="outline"
+                        >
                           <Download className="size-4" />
                           Download
                         </Button>
@@ -372,9 +428,11 @@ export default function Home() {
 
       <footer className="relative border-t border-border/40 mt-20">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>© 2025 ResumeForge. Powered by AI to help you land your dream job.</p>
+          <p>
+            © 2025 ResumeForge. Powered by AI to help you land your dream job.
+          </p>
         </div>
       </footer>
     </div>
-  )
+  );
 }

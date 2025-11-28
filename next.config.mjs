@@ -8,6 +8,6 @@ const nextConfig = {
   },
   transpilePackages: ["jsonresume-theme-even"],
   serverExternalPackages: ["jsonresume-theme-elegant", "jsonresume-theme-flat"],
-}
+};
 
-export default nextConfig
+export default nextConfig;

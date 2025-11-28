@@ -12,6 +12,7 @@ COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
 FROM base AS deps
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 RUN pnpm install --frozen-lockfile
 
 # Build stage
@@ -30,6 +31,19 @@ FROM base AS runner
 
 # Set NODE_ENV to production
 ENV NODE_ENV=production
+
+# Install Chromium and dependencies
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Set Puppeteer environment variables
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs

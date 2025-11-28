@@ -451,7 +451,7 @@ export default function Home() {
               <span className="absolute inset-0 rounded-2xl bg-white/10 blur-xl" />
               <Wand2 className="relative size-5" />
             </div>
-            <div>
+            <div className="max-md:hidden">
               <p className="text-sm uppercase tracking-[0.3em] text-white/60">
                 AI Resume
               </p>
@@ -460,7 +460,7 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <div className="flex gap-3 items-baseline justify-baseline text-right text-xs text-white/70 md:flex">
+          <div className="flex gap-3 justify-center items-center max-sm:flex-col-reverse text-right text-xs text-white/70 md:flex">
             <span className="mt-1 rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-white/60">
               100% free • No sign-in
             </span>
@@ -469,7 +469,7 @@ export default function Home() {
               href="https://github.com/Softjey"
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium text-white hover:text-emerald-200"
+              className="max-sm:self-end text-sm font-medium text-white hover:text-emerald-200"
             >
               Built by Softjey ↗
             </a>

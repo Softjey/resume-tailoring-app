@@ -9,26 +9,18 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ResumeAI - Tailor Your Resume Instantly",
+  title: "AI Resume — Tailor Once, Match Anywhere",
   description:
-    "AI-powered resume tailoring tool. Upload your resume and job description to get perfectly tailored resumes in multiple professional themes.",
-  generator: "v0.app",
+    "AI Resume is a fully free tailoring companion. Upload a single PDF and get immersive, ATS-ready variations for every role without sign-ups.",
+  generator: "AI Resume",
   icons: {
     icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
       {
         url: "/icon.svg",
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: "/icon.svg",
   },
 };
 

@@ -57,7 +57,7 @@ export function ProgressModal({
             <div className="h-3 w-full rounded-full border border-white/10 bg-white/5">
               <div
                 className="h-full rounded-full bg-linear-to-r from-indigo-400 via-purple-400 to-emerald-300 transition-[width] duration-200"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
               />
             </div>
           </div>

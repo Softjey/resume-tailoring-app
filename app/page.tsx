@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { PDFPreview } from "@/components/pdf-preview";
@@ -41,6 +40,7 @@ interface TimelineStep {
   note: string;
   duration: number;
   artificial?: boolean;
+  acceleratedDuration?: number;
 }
 
 const TIMELINE_STEPS: TimelineStep[] = [
@@ -48,45 +48,52 @@ const TIMELINE_STEPS: TimelineStep[] = [
     id: "upload",
     label: "Encrypting your resume upload",
     note: "Secure tunnel & antivirus scan",
-    duration: 2600,
+    duration: 18000,
+    acceleratedDuration: 2200,
   },
   {
     id: "analysis",
     label: "Decoding the job DNA",
     note: "LLM extracts intent & signals",
-    duration: 3200,
+    duration: 21000,
+    acceleratedDuration: 2400,
   },
   {
     id: "alignment",
     label: "Mapping your experience",
     note: "Matching impact stories to role",
-    duration: 3000,
+    duration: 18500,
+    acceleratedDuration: 2300,
   },
   {
     id: "themes",
     label: "Generating draft variations",
     note: "Multiple ATS-friendly styles",
-    duration: 3100,
+    duration: 17500,
+    acceleratedDuration: 2200,
   },
   {
     id: "polish",
     label: "Polishing tone & keywords",
     note: "Intentional phrasing + ATS tuning",
-    duration: 3000,
+    duration: 16500,
+    acceleratedDuration: 2100,
     artificial: true,
   },
   {
     id: "render",
     label: "Rendering premium themes",
     note: "Layering typography system",
-    duration: 2900,
+    duration: 15000,
+    acceleratedDuration: 2000,
     artificial: true,
   },
   {
     id: "handoff",
     label: "Staging interactive preview",
     note: "Preparing download endpoints",
-    duration: 2800,
+    duration: 14000,
+    acceleratedDuration: 2000,
     artificial: true,
   },
 ];
@@ -108,7 +115,6 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("landing");
   const [jobDescription, setJobDescription] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [useMock, setUseMock] = useState(false);
   const [pendingResumes, setPendingResumes] = useState<GeneratedResume[]>([]);
   const [generatedResumes, setGeneratedResumes] = useState<GeneratedResume[]>(
     []
@@ -122,6 +128,61 @@ export default function Home() {
 
   const rafRef = useRef<number | null>(null);
   const cancelTimelineRef = useRef(false);
+  const accelerateTimelineRef = useRef(false);
+  const completionChimePlayedRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playCompletionChime = useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const AudioContextClass =
+        window.AudioContext ||
+        (
+          window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }
+        ).webkitAudioContext;
+
+      if (!AudioContextClass) return;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContextClass();
+      }
+
+      const context = audioContextRef.current;
+      if (!context) return;
+
+      if (context.state === "suspended") {
+        await context.resume();
+      }
+
+      const now = context.currentTime;
+      const chord = [
+        { startOffset: 0, frequency: 392 },
+        { startOffset: 0.12, frequency: 523.25 },
+        { startOffset: 0.24, frequency: 659.25 },
+      ];
+
+      chord.forEach(({ startOffset, frequency }, index) => {
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+
+        oscillator.type = index === chord.length - 1 ? "triangle" : "sine";
+        oscillator.frequency.value = frequency;
+
+        const startAt = now + startOffset;
+        gainNode.gain.setValueAtTime(0.24, startAt);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startAt + 1.4);
+
+        oscillator.connect(gainNode).connect(context.destination);
+        oscillator.start(startAt);
+        oscillator.stop(startAt + 1.5);
+      });
+    } catch (error) {
+      console.error("[audio] Unable to play completion chime", error);
+    }
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -137,10 +198,6 @@ export default function Home() {
     }
 
     setResumeFile(file);
-    toast({
-      title: "Resume locked in",
-      description: file.name,
-    });
   };
 
   const resetProgress = () => {
@@ -148,29 +205,29 @@ export default function Home() {
     setTimelineDone(false);
     setApiDone(false);
     cancelTimelineRef.current = false;
+    accelerateTimelineRef.current = false;
+    completionChimePlayedRef.current = false;
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!useMock) {
-      if (!resumeFile) {
-        toast({
-          title: "Resume missing",
-          description: "Upload your base resume to continue",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!resumeFile) {
+      toast({
+        title: "Resume missing",
+        description: "Upload your base resume to continue",
+        variant: "destructive",
+      });
+      return;
+    }
 
-      if (!jobDescription.trim()) {
-        toast({
-          title: "Job description missing",
-          description: "Paste the job description for alignment",
-          variant: "destructive",
-        });
-        return;
-      }
+    if (!jobDescription.trim()) {
+      toast({
+        title: "Job description missing",
+        description: "Paste the job description for alignment",
+        variant: "destructive",
+      });
+      return;
     }
 
     setStage("loading");
@@ -183,7 +240,6 @@ export default function Home() {
       if (resumeFile) {
         formData.append("resume", resumeFile);
       }
-      formData.append("useMock", String(useMock));
 
       const response = await fetch("/api/tailor-resume", {
         method: "POST",
@@ -201,10 +257,6 @@ export default function Home() {
       if (data.success && Array.isArray(data.resumes)) {
         setPendingResumes(data.resumes);
         setApiDone(true);
-        toast({
-          title: "Tailoring complete",
-          description: "Finishing touches are being staged",
-        });
       } else {
         throw new Error(data.error || "Unexpected response received");
       }
@@ -245,11 +297,6 @@ export default function Home() {
       anchor.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(anchor);
-
-      toast({
-        title: "Download ready",
-        description: `${theme} theme saved locally`,
-      });
     } catch (error) {
       console.error("[resume] download error", error);
       toast({
@@ -286,6 +333,7 @@ export default function Home() {
         await new Promise<void>((resolve) => {
           const start = performance.now();
           const stepPortion = 100 / totalSteps;
+          const quickDuration = step.acceleratedDuration ?? 2200;
 
           const tick = (now: number) => {
             if (cancelTimelineRef.current) {
@@ -294,7 +342,10 @@ export default function Home() {
             }
 
             const elapsed = now - start;
-            const ratio = Math.min(elapsed / step.duration, 1);
+            const targetDuration = accelerateTimelineRef.current
+              ? quickDuration
+              : step.duration;
+            const ratio = Math.min(elapsed / targetDuration, 1);
             const computed =
               index * stepPortion + Math.min(ratio * stepPortion, stepPortion);
 
@@ -339,6 +390,10 @@ export default function Home() {
   }, [stage]);
 
   useEffect(() => {
+    accelerateTimelineRef.current = apiDone;
+  }, [apiDone]);
+
+  useEffect(() => {
     if (stage !== "loading") return;
 
     if (timelineDone && apiDone) {
@@ -350,6 +405,15 @@ export default function Home() {
       return () => clearTimeout(timeout);
     }
   }, [apiDone, pendingResumes, stage, timelineDone]);
+
+  useEffect(() => {
+    if (stage !== "preview" || completionChimePlayedRef.current) {
+      return;
+    }
+
+    completionChimePlayedRef.current = true;
+    playCompletionChime();
+  }, [playCompletionChime, stage]);
 
   const modalSteps = useMemo<ProgressModalStep[]>(
     () =>
@@ -371,7 +435,7 @@ export default function Home() {
   const waitingForResults = timelineDone && !apiDone;
 
   return (
-    <div className="relative min-h-screen bg-[#030712] text-white overflow-hidden">
+    <div className="relative flex min-h-screen flex-col bg-[#030712] text-white">
       <BackgroundAurora />
       <ProgressModal
         isOpen={stage === "loading"}
@@ -381,7 +445,7 @@ export default function Home() {
       />
 
       <header className="relative z-10 border-b border-white/5 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="group relative flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 via-purple-500 to-emerald-400 text-white shadow-lg shadow-purple-500/40">
               <span className="absolute inset-0 rounded-2xl bg-white/10 blur-xl" />
@@ -389,64 +453,62 @@ export default function Home() {
             </div>
             <div>
               <p className="text-sm uppercase tracking-[0.3em] text-white/60">
-                ResumeForge
+                AI Resume
               </p>
               <p className="text-lg font-semibold text-white">
-                Role-matched tailoring
+                Immersive role-matching
               </p>
             </div>
           </div>
-          <div className="hidden gap-3 text-sm text-white/70 md:flex">
-            <div className="rounded-full border border-white/10 px-4 py-1">
-              <span className="text-white">ATS-Ready PDFs</span>
-            </div>
-            <div className="rounded-full border border-white/10 px-4 py-1">
-              <span>Secure resume processing</span>
-            </div>
+          <div className="flex gap-3 items-baseline justify-baseline text-right text-xs text-white/70 md:flex">
+            <span className="mt-1 rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.3em] text-white/60">
+              100% free • No sign-in
+            </span>
+
+            <a
+              href="https://github.com/Softjey"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-white hover:text-emerald-200"
+            >
+              Built by Softjey ↗
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto grid max-w-6xl gap-12 px-6 py-12">
-        {stage === "landing" && (
-          <LandingView onStart={() => setStage("form")} />
-        )}
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
+        <div className="w-full max-w-6xl">
+          {stage === "landing" && (
+            <LandingView onStart={() => setStage("form")} />
+          )}
 
-        {stage === "form" && (
-          <FormView
-            jobDescription={jobDescription}
-            resumeFile={resumeFile}
-            useMock={useMock}
-            onSubmit={handleSubmit}
-            onFileChange={handleFileChange}
-            onBack={() => setStage("landing")}
-            onChangeJobDescription={setJobDescription}
-            onToggleMock={setUseMock}
-          />
-        )}
+          {stage === "form" && (
+            <FormView
+              jobDescription={jobDescription}
+              resumeFile={resumeFile}
+              onSubmit={handleSubmit}
+              onFileChange={handleFileChange}
+              onBack={() => setStage("landing")}
+              onChangeJobDescription={setJobDescription}
+            />
+          )}
 
-        {stage === "preview" && (
-          <PreviewView
-            resumes={generatedResumes}
-            onDownload={handleDownload}
-            downloadingTheme={downloadingTheme}
-            onRestart={() => {
-              setGeneratedResumes([]);
-              setPendingResumes([]);
-              setStage("form");
-            }}
-          />
-        )}
-      </main>
-
-      <footer className="relative z-10 border-t border-white/5">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-white/60">
-          <p>© 2025 ResumeForge — AI resume tailoring for every role.</p>
-          <p className="text-white/80">
-            Secure uploads • Targeted rewrites • ATS-ready PDFs
-          </p>
+          {stage === "preview" && (
+            <PreviewView
+              resumes={generatedResumes}
+              onDownload={handleDownload}
+              downloadingTheme={downloadingTheme}
+              onRestart={() => {
+                setGeneratedResumes([]);
+                setPendingResumes([]);
+                completionChimePlayedRef.current = false;
+                setStage("form");
+              }}
+            />
+          )}
         </div>
-      </footer>
+      </main>
     </div>
   );
 }
@@ -454,16 +516,18 @@ export default function Home() {
 function LandingView({ onStart }: { onStart: () => void }) {
   const highlights = [
     {
-      title: "Realtime tailoring",
-      description: "Adaptive AI syncs to every job posting within seconds",
+      title: "Immersive tailoring",
+      description:
+        "AI Resume keeps iterating for two minutes to mirror the role",
     },
     {
       title: "Impact-first edits",
-      description: "Wordsmith bullet points to reflect measurable outcomes",
+      description:
+        "Bullet points get reframed around metrics, verbs, and proof",
     },
     {
       title: "Private by design",
-      description: "Local encryption tunnels keep resumes confidential",
+      description: "Uploads stay encrypted, nothing is stored after delivery",
     },
   ];
 
@@ -472,19 +536,19 @@ function LandingView({ onStart }: { onStart: () => void }) {
       <div className="flex flex-col gap-8 text-center">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
           <Stars className="size-4 text-emerald-300" />
-          AI resume tailoring
+          AI Resume live pipeline
         </div>
         <div className="space-y-6">
-          <h1 className="flex gap-2 flex-col text-4xl font-semibold leading-tight text-white md:text-6xl">
-            <span>Tailor every resume to fit.</span>
-            <span className="bg-linear-to-r from-indigo-300 via-purple-200 to-emerald-200 bg-clip-text text-transparent">
-              Upload once, match any role.
+          <h1 className="flex flex-col gap-2 text-4xl font-semibold leading-tight text-white md:text-6xl">
+            <span>Meet AI Resume.</span>
+            <span className="bg-linear-to-r from-indigo-200 via-purple-200 to-emerald-100 bg-clip-text text-transparent">
+              One upload, cinematic tailoring.
             </span>
           </h1>
           <p className="mx-auto max-w-3xl text-lg text-white/70">
-            ResumeForge rewrites your achievements to mirror each job
-            description, prioritizes ATS keywords, and produces polished PDFs
-            that are ready to send to recruiters instantly.
+            AI Resume rewrites your achievements to mirror each job description,
+            prioritizes ATS keywords, and produces polished PDFs without asking
+            for logins, cards, or upgrades.
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -493,9 +557,22 @@ function LandingView({ onStart }: { onStart: () => void }) {
             className="group h-14 rounded-full border border-white/20 bg-white/10 px-8 text-base font-semibold text-white transition hover:bg-white/20"
             onClick={onStart}
           >
-            Begin tailoring
+            Start tailoring
             <ArrowRight className="ml-2 size-5 transition group-hover:translate-x-1" />
           </Button>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-white/70">
+          <a
+            href="https://github.com/Softjey"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-white/10 px-4 py-1 text-white hover:text-emerald-200"
+          >
+            Crafted by Softjey
+          </a>
+          <span className="rounded-full border border-white/10 px-4 py-1 uppercase tracking-[0.3em] text-[11px]">
+            Free forever • No signup
+          </span>
         </div>
       </div>
 
@@ -519,22 +596,18 @@ function LandingView({ onStart }: { onStart: () => void }) {
 interface FormViewProps {
   jobDescription: string;
   resumeFile: File | null;
-  useMock: boolean;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onChangeJobDescription: (value: string) => void;
-  onToggleMock: (value: boolean) => void;
   onBack: () => void;
 }
 
 function FormView({
   jobDescription,
   resumeFile,
-  useMock,
   onSubmit,
   onFileChange,
   onChangeJobDescription,
-  onToggleMock,
   onBack,
 }: FormViewProps) {
   return (
@@ -542,13 +615,14 @@ function FormView({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-white/50">
-            Resume inputs
+            Pipeline inputs
           </p>
           <h2 className="mt-1 text-3xl font-semibold text-white">
-            Upload your resume and specify the role
+            Upload once and cite the role
           </h2>
           <p className="text-white/60">
-            Secure resume upload plus the role you are targeting.
+            AI Resume stays free and accountless—just drop your PDF and the
+            description you want to mirror.
           </p>
         </div>
         <Button
@@ -617,23 +691,12 @@ function FormView({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="useMock"
-                  checked={useMock}
-                  onCheckedChange={(checked) => onToggleMock(Boolean(checked))}
-                />
-                <Label htmlFor="useMock" className="text-white/70">
-                  Use mock payload (dev)
-                </Label>
-              </div>
-
               <Button
                 type="submit"
                 size="lg"
                 className="group flex w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-emerald-400 py-4 text-base font-semibold text-white shadow-lg shadow-purple-500/50 transition hover:opacity-90"
               >
-                Launch tailoring pipeline
+                Launch AI tailoring
                 <ArrowRight className="size-5 transition group-hover:translate-x-1" />
               </Button>
             </form>

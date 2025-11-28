@@ -3,13 +3,15 @@ import { resumeStore } from "@/lib/resume-store";
 import { themes } from "@/lib/themes";
 import { mockResumeData } from "@/lib/mock-resume";
 
+const USE_MOCK = process.env.USE_MOCK === "true";
+
 export async function POST(request: NextRequest) {
   try {
     console.log("Starting tailor resume request");
     const formData = await request.formData();
     const jobDescription = formData.get("jobDescription") as string;
     const resumeFile = formData.get("resume") as File;
-    const useMock = formData.get("useMock") === "true";
+    const useMock = USE_MOCK;
 
     console.log("[v0] API Route - Received request", {
       hasJobDescription: !!jobDescription,

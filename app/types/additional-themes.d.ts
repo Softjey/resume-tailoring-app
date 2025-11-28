@@ -1,0 +1,16 @@
+declare module "jsonresume-theme-jacrys";
+declare module "jsonresume-theme-kendall";
+declare module "jsonresume-theme-macchiato";
+declare module "jsonresume-theme-pumpkin";
+declare module "jsonresume-theme-modern";
+declare module "jsonresume-theme-short";
+declare module "jsonresume-theme-paper";
+declare module "jsonresume-theme-minyma";
+declare module "jsonresume-theme-tan-responsive";
+declare module "jsonresume-theme-rickosborne";
+declare module "jsonresume-theme-eloquent";
+declare module "jsonresume-theme-onepage-plus";
+declare module "jsonresume-theme-autumn";
+declare module "jsonresume-theme-spartan";
+declare module "jsonresume-theme-minimal";
+declare module "jsonresume-theme-crisp";

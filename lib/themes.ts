@@ -1,7 +1,27 @@
 import { render } from "resumed";
 import he from "he";
 
-export const themes = ["even", "elegant", "flat"];
+export const themes = [
+  "elegant",
+  "flat",
+  "even",
+  "jacrys",
+  "kendall",
+  "macchiato",
+  "pumpkin",
+  "modern",
+  "short",
+  "paper",
+  "minyma",
+  "tan-responsive",
+  "rickosborne",
+  "eloquent",
+  "onepage-plus",
+  "autumn",
+  "spartan",
+  "minimal",
+  "crisp",
+];
 
 // Helper to recursively decode HTML entities in strings
 function decodeResumeData(data: any): any {
@@ -27,14 +47,66 @@ export async function renderTheme(themeName: string, resume: any) {
 
   let themeModule;
   try {
-    if (themeName === "even") {
-      themeModule = await import("jsonresume-theme-even");
-    } else if (themeName === "elegant") {
-      themeModule = await import("jsonresume-theme-elegant");
-    } else if (themeName === "flat") {
-      themeModule = await import("jsonresume-theme-flat");
-    } else {
-      throw new Error(`Unknown theme: ${themeName}`);
+    switch (themeName) {
+      case "elegant":
+        themeModule = await import("jsonresume-theme-elegant");
+        break;
+      case "flat":
+        themeModule = await import("jsonresume-theme-flat");
+        break;
+      case "even":
+        themeModule = await import("jsonresume-theme-even");
+        break;
+      case "jacrys":
+        themeModule = await import("jsonresume-theme-jacrys");
+        break;
+      case "kendall":
+        themeModule = await import("jsonresume-theme-kendall");
+        break;
+      case "macchiato":
+        themeModule = await import("jsonresume-theme-macchiato");
+        break;
+      case "pumpkin":
+        themeModule = await import("jsonresume-theme-pumpkin");
+        break;
+      case "modern":
+        themeModule = await import("jsonresume-theme-modern");
+        break;
+      case "short":
+        themeModule = await import("jsonresume-theme-short");
+        break;
+      case "paper":
+        themeModule = await import("jsonresume-theme-paper");
+        break;
+      case "minyma":
+        themeModule = await import("jsonresume-theme-minyma");
+        break;
+      case "tan-responsive":
+        themeModule = await import("jsonresume-theme-tan-responsive");
+        break;
+      case "rickosborne":
+        themeModule = await import("jsonresume-theme-rickosborne");
+        break;
+      case "eloquent":
+        themeModule = await import("jsonresume-theme-eloquent");
+        break;
+      case "onepage-plus":
+        themeModule = await import("jsonresume-theme-onepage-plus");
+        break;
+      case "autumn":
+        themeModule = await import("jsonresume-theme-autumn");
+        break;
+      case "spartan":
+        themeModule = await import("jsonresume-theme-spartan");
+        break;
+      case "minimal":
+        themeModule = await import("jsonresume-theme-minimal");
+        break;
+      case "crisp":
+        themeModule = await import("jsonresume-theme-crisp");
+        break;
+      default:
+        throw new Error(`Unknown theme: ${themeName}`);
     }
   } catch (e) {
     console.error(`[v0] Failed to load theme ${themeName}:`, e);

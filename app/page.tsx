@@ -630,6 +630,7 @@ function FormView({
 
               <Button
                 type="submit"
+                size="lg"
                 className="group flex w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-emerald-400 py-4 text-base font-semibold text-white shadow-lg shadow-purple-500/50 transition hover:opacity-90"
               >
                 Launch tailoring pipeline

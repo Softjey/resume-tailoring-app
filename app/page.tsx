@@ -545,7 +545,7 @@ function FormView({
             Resume inputs
           </p>
           <h2 className="mt-1 text-3xl font-semibold text-white">
-            Upload + Context
+            Upload your resume and specify the role
           </h2>
           <p className="text-white/60">
             Secure resume upload plus the role you are targeting.

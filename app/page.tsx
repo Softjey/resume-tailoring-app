@@ -1,17 +1,16 @@
 "use client";
 
-import type React from "react";
-
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Upload,
-  Sparkles,
-  Download,
-  FileText,
-  Loader2,
-  Wand2,
-  Stars,
   ArrowRight,
+  CheckCircle2,
+  Download,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  Stars,
+  Upload,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,9 +18,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { PDFPreview } from "@/components/pdf-preview";
-import { ProgressModal } from "@/components/progress-modal";
+import {
+  ProgressModal,
+  type ProgressModalStep,
+  type StepStatus,
+} from "@/components/progress-modal";
+import { cn } from "@/lib/utils";
 
 interface GeneratedResume {
   theme: string;
@@ -30,44 +33,131 @@ interface GeneratedResume {
   id: string;
 }
 
+type Stage = "landing" | "form" | "loading" | "preview";
+
+interface TimelineStep {
+  id: string;
+  label: string;
+  note: string;
+  duration: number;
+  artificial?: boolean;
+}
+
+const TIMELINE_STEPS: TimelineStep[] = [
+  {
+    id: "upload",
+    label: "Encrypting your resume upload",
+    note: "Secure tunnel & antivirus scan",
+    duration: 2600,
+  },
+  {
+    id: "analysis",
+    label: "Decoding the job DNA",
+    note: "LLM extracts intent & signals",
+    duration: 3200,
+  },
+  {
+    id: "alignment",
+    label: "Mapping your experience",
+    note: "Matching impact stories to role",
+    duration: 3000,
+  },
+  {
+    id: "themes",
+    label: "Generating draft variations",
+    note: "Multiple ATS-friendly styles",
+    duration: 3100,
+  },
+  {
+    id: "polish",
+    label: "Polishing tone & keywords",
+    note: "Intentional phrasing + ATS tuning",
+    duration: 3000,
+    artificial: true,
+  },
+  {
+    id: "render",
+    label: "Rendering premium themes",
+    note: "Layering typography system",
+    duration: 2900,
+    artificial: true,
+  },
+  {
+    id: "handoff",
+    label: "Staging interactive preview",
+    note: "Preparing download endpoints",
+    duration: 2800,
+    artificial: true,
+  },
+];
+
+interface ProgressVisualState {
+  progress: number;
+  activeStepId: string;
+  completedIds: string[];
+}
+
+const createInitialProgressState = (): ProgressVisualState => ({
+  progress: 0,
+  activeStepId: TIMELINE_STEPS[0].id,
+  completedIds: [],
+});
+
 export default function Home() {
+  const { toast } = useToast();
+  const [stage, setStage] = useState<Stage>("landing");
   const [jobDescription, setJobDescription] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [useMock, setUseMock] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [pendingResumes, setPendingResumes] = useState<GeneratedResume[]>([]);
   const [generatedResumes, setGeneratedResumes] = useState<GeneratedResume[]>(
     []
   );
-  const [showForm, setShowForm] = useState(false);
-  const { toast } = useToast();
+  const [timelineDone, setTimelineDone] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
+  const [progressState, setProgressState] = useState<ProgressVisualState>(
+    createInitialProgressState
+  );
+  const [downloadingTheme, setDownloadingTheme] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setResumeFile(file);
+  const rafRef = useRef<number | null>(null);
+  const cancelTimelineRef = useRef(false);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
       toast({
-        title: "File uploaded",
-        description: file.name,
+        title: "Unsupported file",
+        description: "Only PDF resumes are accepted",
+        variant: "destructive",
       });
+      return;
     }
+
+    setResumeFile(file);
+    toast({
+      title: "Resume locked in",
+      description: file.name,
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetProgress = () => {
+    setProgressState(createInitialProgressState());
+    setTimelineDone(false);
+    setApiDone(false);
+    cancelTimelineRef.current = false;
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
     if (!useMock) {
       if (!resumeFile) {
         toast({
-          title: "Missing file",
-          description: "Please upload your resume",
+          title: "Resume missing",
+          description: "Upload your base resume to continue",
           variant: "destructive",
         });
         return;
@@ -75,16 +165,17 @@ export default function Home() {
 
       if (!jobDescription.trim()) {
         toast({
-          title: "Missing information",
-          description: "Please enter a job description",
+          title: "Job description missing",
+          description: "Paste the job description for alignment",
           variant: "destructive",
         });
         return;
       }
     }
 
-    setIsLoading(true);
-    setGeneratedResumes([]);
+    setStage("loading");
+    resetProgress();
+    setPendingResumes([]);
 
     try {
       const formData = new FormData();
@@ -94,48 +185,51 @@ export default function Home() {
       }
       formData.append("useMock", String(useMock));
 
-      console.log("Sending tailor resume request");
       const response = await fetch("/api/tailor-resume", {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
-        console.log("Tailor resume error");
         const errorData = await response
           .json()
-          .catch(() => ({ error: "Unknown error" }));
-        console.log(errorData);
+          .catch(() => ({ error: "Failed to process resume" }));
         throw new Error(errorData.error || "Failed to process resume");
       }
 
       const data = await response.json();
-
-      if (data.success && data.resumes) {
-        setGeneratedResumes(data.resumes);
+      if (data.success && Array.isArray(data.resumes)) {
+        setPendingResumes(data.resumes);
+        setApiDone(true);
         toast({
-          title: "Success!",
-          description: "Your resume has been tailored in multiple themes",
+          title: "Tailoring complete",
+          description: "Finishing touches are being staged",
         });
       } else {
-        throw new Error(data.error || "Failed to generate resumes");
+        throw new Error(data.error || "Unexpected response received");
       }
     } catch (error) {
+      console.error("[resume] tailor error", error);
       toast({
-        title: "Error",
+        title: "Unable to tailor resume",
         description:
-          error instanceof Error ? error.message : "Failed to process resume",
+          error instanceof Error ? error.message : "Please try again shortly",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      setStage("form");
+      setTimelineDone(false);
+      setApiDone(false);
+      cancelTimelineRef.current = true;
     }
   };
 
   const handleDownload = async (theme: string, id: string) => {
     try {
+      setDownloadingTheme(theme);
       const response = await fetch(
-        `/api/download-resume?theme=${theme}&id=${id}`
+        `/api/download-resume?theme=${encodeURIComponent(
+          theme
+        )}&id=${encodeURIComponent(id)}`
       );
 
       if (!response.ok) {
@@ -144,295 +238,547 @@ export default function Home() {
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `resume-${theme}.pdf`;
-      document.body.appendChild(a);
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `resume-${theme}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      document.body.removeChild(anchor);
 
       toast({
-        title: "Downloaded!",
-        description: `Resume downloaded in ${theme} theme`,
+        title: "Download ready",
+        description: `${theme} theme saved locally`,
       });
     } catch (error) {
-      console.error("[v0] Download error:", error);
+      console.error("[resume] download error", error);
       toast({
-        title: "Error",
-        description: "Failed to download resume",
+        title: "Download failed",
+        description: "Please retry in a moment",
         variant: "destructive",
       });
+    } finally {
+      setDownloadingTheme(null);
     }
   };
 
+  useEffect(() => {
+    if (stage !== "loading") {
+      cancelTimelineRef.current = true;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      return;
+    }
+
+    cancelTimelineRef.current = false;
+    setProgressState(createInitialProgressState());
+    setTimelineDone(false);
+
+    const totalSteps = TIMELINE_STEPS.length;
+
+    const runTimeline = async () => {
+      for (let index = 0; index < TIMELINE_STEPS.length; index += 1) {
+        if (cancelTimelineRef.current) return;
+        const step = TIMELINE_STEPS[index];
+
+        await new Promise<void>((resolve) => {
+          const start = performance.now();
+          const stepPortion = 100 / totalSteps;
+
+          const tick = (now: number) => {
+            if (cancelTimelineRef.current) {
+              resolve();
+              return;
+            }
+
+            const elapsed = now - start;
+            const ratio = Math.min(elapsed / step.duration, 1);
+            const computed =
+              index * stepPortion + Math.min(ratio * stepPortion, stepPortion);
+
+            setProgressState((prev) => ({
+              progress: computed,
+              activeStepId: step.id,
+              completedIds: prev.completedIds,
+            }));
+
+            if (ratio < 1) {
+              rafRef.current = requestAnimationFrame(tick);
+            } else {
+              setProgressState((prev) => ({
+                progress: index === totalSteps - 1 ? 100 : computed,
+                activeStepId: step.id,
+                completedIds: prev.completedIds.includes(step.id)
+                  ? prev.completedIds
+                  : [...prev.completedIds, step.id],
+              }));
+              resolve();
+            }
+          };
+
+          rafRef.current = requestAnimationFrame(tick);
+        });
+
+        if (cancelTimelineRef.current) return;
+      }
+
+      setTimelineDone(true);
+    };
+
+    runTimeline();
+
+    return () => {
+      cancelTimelineRef.current = true;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [stage]);
+
+  useEffect(() => {
+    if (stage !== "loading") return;
+
+    if (timelineDone && apiDone) {
+      const timeout = setTimeout(() => {
+        setGeneratedResumes(pendingResumes);
+        setStage("preview");
+      }, 600);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [apiDone, pendingResumes, stage, timelineDone]);
+
+  const modalSteps = useMemo<ProgressModalStep[]>(
+    () =>
+      TIMELINE_STEPS.map((step) => {
+        const status: StepStatus = progressState.completedIds.includes(step.id)
+          ? "done"
+          : progressState.activeStepId === step.id
+          ? "active"
+          : "pending";
+
+        return {
+          ...step,
+          status,
+        } satisfies ProgressModalStep;
+      }),
+    [progressState.completedIds, progressState.activeStepId]
+  );
+
+  const waitingForResults = timelineDone && !apiDone;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 relative overflow-hidden">
-      <ProgressModal isOpen={isLoading} />
+    <div className="relative min-h-screen bg-[#030712] text-white overflow-hidden">
+      <BackgroundAurora />
+      <ProgressModal
+        isOpen={stage === "loading"}
+        progress={progressState.progress}
+        steps={modalSteps}
+        waitingForResults={waitingForResults}
+      />
 
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 size-72 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-20 right-20 size-96 bg-chart-1/20 rounded-full blur-[120px] animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[600px] bg-chart-2/10 rounded-full blur-[150px] animate-pulse delay-2000" />
-      </div>
-
-      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-
-      <header className="relative border-b border-border/40 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="size-10 rounded-lg bg-gradient-to-br from-primary to-chart-1 flex items-center justify-center shadow-lg">
-              <Wand2 className="size-5 text-primary-foreground" />
+      <header className="relative z-10 border-b border-white/5 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="group relative flex size-12 items-center justify-center rounded-2xl bg-linear-to-br from-indigo-500 via-purple-500 to-emerald-400 text-white shadow-lg shadow-purple-500/40">
+              <span className="absolute inset-0 rounded-2xl bg-white/10 blur-xl" />
+              <Wand2 className="relative size-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">ResumeForge</h1>
-              <p className="text-xs text-muted-foreground">
-                AI-powered resume magic
+              <p className="text-sm uppercase tracking-[0.3em] text-white/60">
+                ResumeForge
+              </p>
+              <p className="text-lg font-semibold text-white">
+                Role-matched tailoring
               </p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="hidden gap-3 text-sm text-white/70 md:flex">
+            <div className="rounded-full border border-white/10 px-4 py-1">
+              <span className="text-white">ATS-Ready PDFs</span>
+            </div>
+            <div className="rounded-full border border-white/10 px-4 py-1">
+              <span>Secure resume processing</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="relative container mx-auto px-4 py-12 max-w-6xl">
-        {!showForm ? (
-          <div className="min-h-[80vh] flex flex-col items-center justify-center text-center space-y-8 py-20">
-            <div className="space-y-6 max-w-4xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium backdrop-blur-sm border border-primary/20 animate-fade-in">
-                <Stars className="size-4 animate-pulse" />
-                Transform Your Resume with AI Magic
-              </div>
+      <main className="relative z-10 mx-auto grid max-w-6xl gap-12 px-6 py-12">
+        {stage === "landing" && (
+          <LandingView onStart={() => setStage("form")} />
+        )}
 
-              <h1 className="text-5xl md:text-7xl font-bold text-balance text-foreground leading-tight">
-                Land Your Dream Job
-                <br />
-                <span className="bg-gradient-to-r from-primary via-chart-1 to-chart-2 bg-clip-text text-transparent animate-gradient">
-                  With AI-Crafted Resumes
-                </span>
-              </h1>
+        {stage === "form" && (
+          <FormView
+            jobDescription={jobDescription}
+            resumeFile={resumeFile}
+            useMock={useMock}
+            onSubmit={handleSubmit}
+            onFileChange={handleFileChange}
+            onBack={() => setStage("landing")}
+            onChangeJobDescription={setJobDescription}
+            onToggleMock={setUseMock}
+          />
+        )}
 
-              <p className="text-xl md:text-2xl text-muted-foreground text-balance max-w-3xl mx-auto leading-relaxed">
-                Upload your resume, paste any job description, and watch as our
-                AI tailors your resume perfectly. Get multiple professional
-                themes in seconds.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 items-center justify-center pt-8">
-                <Button
-                  onClick={() => setShowForm(true)}
-                  size="lg"
-                  className="h-14 px-8 text-lg font-semibold bg-gradient-to-r from-primary to-chart-1 hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105 group"
-                >
-                  <Wand2 className="size-5 group-hover:rotate-12 transition-transform" />
-                  Start Tailoring Now
-                  <ArrowRight className="size-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-20 max-w-5xl mx-auto">
-              <Card className="backdrop-blur-sm bg-card/50 border-border/50 hover:shadow-xl transition-all hover:scale-105">
-                <CardContent className="p-6 space-y-3 text-center">
-                  <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                    <Sparkles className="size-6 text-primary" />
-                  </div>
-                  <h3 className="font-semibold text-lg">AI-Powered</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Advanced AI analyzes and tailors your resume to match job
-                    requirements perfectly
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="backdrop-blur-sm bg-card/50 border-border/50 hover:shadow-xl transition-all hover:scale-105">
-                <CardContent className="p-6 space-y-3 text-center">
-                  <div className="size-12 rounded-full bg-chart-1/10 flex items-center justify-center mx-auto">
-                    <FileText className="size-6 text-chart-1" />
-                  </div>
-                  <h3 className="font-semibold text-lg">Multiple Themes</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Choose from professional, elegant, and flat designs to match
-                    your style
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="backdrop-blur-sm bg-card/50 border-border/50 hover:shadow-xl transition-all hover:scale-105">
-                <CardContent className="p-6 space-y-3 text-center">
-                  <div className="size-12 rounded-full bg-chart-2/10 flex items-center justify-center mx-auto">
-                    <Download className="size-6 text-chart-2" />
-                  </div>
-                  <h3 className="font-semibold text-lg">Instant Download</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Get your tailored resume in seconds, ready to submit to
-                    employers
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="text-center mb-12 space-y-4">
-              <Button
-                onClick={() => setShowForm(false)}
-                variant="ghost"
-                size="sm"
-                className="mb-4"
-              >
-                ← Back to Home
-              </Button>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                <Sparkles className="size-4" />
-                AI-Powered Resume Tailoring
-              </div>
-              <h2 className="text-4xl md:text-5xl font-bold text-balance text-foreground">
-                Create Your
-                <span className="bg-gradient-to-r from-primary via-chart-1 to-chart-2 bg-clip-text text-transparent">
-                  {" "}
-                  Perfect Resume
-                </span>
-              </h2>
-              <p className="text-lg text-muted-foreground text-balance max-w-2xl mx-auto">
-                Upload your resume first, then paste the job description. Our AI
-                will tailor it perfectly.
-              </p>
-            </div>
-
-            <Card className="backdrop-blur-sm bg-card/80 border-border/50 shadow-xl">
-              <CardContent className="p-6 md:p-8">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="resume"
-                      className="text-sm font-medium text-foreground flex items-center gap-2"
-                    >
-                      <FileText className="size-4" />
-                      Your Resume (PDF)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="file"
-                        id="resume"
-                        accept=".pdf"
-                        onChange={handleFileChange}
-                        className="sr-only"
-                      />
-                      <label
-                        htmlFor="resume"
-                        className="flex items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors bg-background/50 hover:bg-accent/5"
-                      >
-                        <Upload className="size-5 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          {resumeFile
-                            ? resumeFile.name
-                            : "Click to upload or drag and drop"}
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="jobDescription"
-                      className="text-sm font-medium text-foreground flex items-center gap-2"
-                    >
-                      <Sparkles className="size-4" />
-                      Job Description
-                    </label>
-                    <Textarea
-                      id="jobDescription"
-                      placeholder="Paste the job description here..."
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      className="min-h-[200px] resize-y bg-background/50"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="useMock"
-                      checked={useMock}
-                      onCheckedChange={(checked) =>
-                        setUseMock(checked as boolean)
-                      }
-                    />
-                    <Label htmlFor="useMock">Use Mock Data (Dev Only)</Label>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-chart-1 hover:opacity-90 transition-opacity"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="size-5 animate-spin" />
-                        Processing Your Resume...
-                      </>
-                    ) : (
-                      <>
-                        <Wand2 className="size-5" />
-                        Tailor My Resume
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {generatedResumes.length > 0 && (
-              <div className="mt-12 space-y-6">
-                <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-bold text-foreground">
-                    Your Tailored Resumes
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Select your favorite theme and download
-                  </p>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-6">
-                  {generatedResumes.map((resume) => (
-                    <Card
-                      key={resume.theme}
-                      className="overflow-hidden hover:shadow-lg transition-shadow"
-                    >
-                      <div className="h-[400px] w-full bg-muted relative overflow-hidden">
-                        <PDFPreview pdfUrl={resume.pdfUrl} />
-                      </div>
-                      <CardContent className="p-4 space-y-3">
-                        <h4 className="font-semibold text-lg capitalize text-foreground">
-                          {resume.label}
-                        </h4>
-                        <Button
-                          onClick={() =>
-                            handleDownload(resume.theme, resume.id)
-                          }
-                          className="w-full"
-                          variant="outline"
-                        >
-                          <Download className="size-4" />
-                          Download
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
+        {stage === "preview" && (
+          <PreviewView
+            resumes={generatedResumes}
+            onDownload={handleDownload}
+            downloadingTheme={downloadingTheme}
+            onRestart={() => {
+              setGeneratedResumes([]);
+              setPendingResumes([]);
+              setStage("form");
+            }}
+          />
         )}
       </main>
 
-      <footer className="relative border-t border-border/40 mt-20">
-        <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>
-            © 2025 ResumeForge. Powered by AI to help you land your dream job.
+      <footer className="relative z-10 border-t border-white/5">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6 text-sm text-white/60">
+          <p>© 2025 ResumeForge — AI resume tailoring for every role.</p>
+          <p className="text-white/80">
+            Secure uploads • Targeted rewrites • ATS-ready PDFs
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function LandingView({ onStart }: { onStart: () => void }) {
+  const highlights = [
+    {
+      title: "Realtime tailoring",
+      description: "Adaptive AI syncs to every job posting within seconds",
+    },
+    {
+      title: "Impact-first edits",
+      description: "Wordsmith bullet points to reflect measurable outcomes",
+    },
+    {
+      title: "Private by design",
+      description: "Local encryption tunnels keep resumes confidential",
+    },
+  ];
+
+  return (
+    <section className="relative flex flex-col gap-16 overflow-hidden rounded-4xl border border-white/5 bg-linear-to-b from-white/5 to-transparent px-8 py-16 shadow-[0_20px_120px_-60px_rgba(79,70,229,0.6)]">
+      <div className="flex flex-col gap-8 text-center">
+        <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
+          <Stars className="size-4 text-emerald-300" />
+          AI resume tailoring
+        </div>
+        <div className="space-y-6">
+          <h1 className="text-4xl font-semibold leading-tight text-white md:text-6xl">
+            Tailor every resume to fit.
+            <span className="block text-transparent">&nbsp;</span>
+            <span className="bg-linear-to-r from-indigo-300 via-purple-200 to-emerald-200 bg-clip-text text-transparent">
+              Upload once, match any role.
+            </span>
+          </h1>
+          <p className="mx-auto max-w-3xl text-lg text-white/70">
+            ResumeForge rewrites your achievements to mirror each job
+            description, prioritizes ATS keywords, and produces polished PDFs
+            that are ready to send to recruiters instantly.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <Button
+            size="lg"
+            className="group h-14 rounded-full border border-white/20 bg-white/10 px-8 text-base font-semibold text-white transition hover:bg-white/20"
+            onClick={onStart}
+          >
+            Begin tailoring
+            <ArrowRight className="ml-2 size-5 transition group-hover:translate-x-1" />
+          </Button>
+          <div className="rounded-full border border-white/10 px-6 py-3 text-sm text-white/70">
+            Upload resume + job goals
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {highlights.map((item) => (
+          <div
+            key={item.title}
+            className="rounded-2xl border border-white/5 bg-white/5 px-5 py-6 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+          >
+            <p className="text-sm uppercase tracking-wide text-emerald-200/90">
+              {item.title}
+            </p>
+            <p className="mt-2 text-base text-white/70">{item.description}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+interface FormViewProps {
+  jobDescription: string;
+  resumeFile: File | null;
+  useMock: boolean;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChangeJobDescription: (value: string) => void;
+  onToggleMock: (value: boolean) => void;
+  onBack: () => void;
+}
+
+function FormView({
+  jobDescription,
+  resumeFile,
+  useMock,
+  onSubmit,
+  onFileChange,
+  onChangeJobDescription,
+  onToggleMock,
+  onBack,
+}: FormViewProps) {
+  return (
+    <section className="space-y-10">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/50">
+            Resume inputs
+          </p>
+          <h2 className="mt-1 text-3xl font-semibold text-white">
+            Upload + Context
+          </h2>
+          <p className="text-white/60">
+            Secure resume upload plus the role you are targeting.
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="text-white/70 hover:text-white"
+        >
+          ← Back to intro
+        </Button>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-white/5 bg-white/5 text-white">
+          <CardContent className="space-y-6 p-8">
+            <form onSubmit={onSubmit} className="space-y-6">
+              <div className="space-y-3">
+                <Label
+                  htmlFor="resume"
+                  className="flex items-center gap-2 text-white"
+                >
+                  <ShieldCheck className="size-4 text-emerald-200" />
+                  Resume upload (PDF)
+                </Label>
+                <label
+                  htmlFor="resume"
+                  className={cn(
+                    "flex cursor-pointer flex-col gap-3 rounded-2xl border border-dashed border-white/15 px-6 py-7 text-sm text-white/60 transition hover:border-white/40",
+                    !resumeFile && "bg-white/5"
+                  )}
+                >
+                  <input
+                    id="resume"
+                    type="file"
+                    accept=".pdf"
+                    className="sr-only"
+                    onChange={onFileChange}
+                  />
+                  <div className="flex items-center gap-3 text-white">
+                    <Upload className="size-5 text-emerald-200" />
+                    {resumeFile
+                      ? resumeFile.name
+                      : "Click to upload or drag & drop"}
+                  </div>
+                  <p className="text-xs text-white/60">
+                    Encrypted locally, never stored. Max 5MB.
+                  </p>
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <Label
+                  htmlFor="jobDescription"
+                  className="flex items-center gap-2 text-white"
+                >
+                  <Sparkles className="size-4 text-fuchsia-200" />
+                  Target job description
+                </Label>
+                <Textarea
+                  id="jobDescription"
+                  value={jobDescription}
+                  onChange={(event) =>
+                    onChangeJobDescription(event.target.value)
+                  }
+                  placeholder="Paste the job posting or recruiter notes here..."
+                  className="min-h-[220px] resize-y border-white/10 bg-black/20 text-white placeholder:text-white/40"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="useMock"
+                  checked={useMock}
+                  onCheckedChange={(checked) => onToggleMock(Boolean(checked))}
+                />
+                <Label htmlFor="useMock" className="text-white/70">
+                  Use mock payload (dev)
+                </Label>
+              </div>
+
+              <Button
+                type="submit"
+                className="group flex w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-emerald-400 py-4 text-base font-semibold text-white shadow-lg shadow-purple-500/50 transition hover:opacity-90"
+              >
+                Launch tailoring pipeline
+                <ArrowRight className="size-5 transition group-hover:translate-x-1" />
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6 rounded-[28px] border border-white/5 bg-linear-to-b from-white/10 to-white/5 p-8">
+          <p className="text-sm uppercase tracking-[0.4em] text-white/50">
+            What we tailor
+          </p>
+          <div className="space-y-5">
+            {["Upload", "Align", "Enhance", "Preview"].map((label, index) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm text-white/70">
+                  {index + 1}
+                </div>
+                <div>
+                  <p className="text-white">{label}</p>
+                  <p className="text-sm text-white/60">
+                    {index === 0 && "Import your PDF resume plus target role."}
+                    {index === 1 &&
+                      "AI mirrors the job description and prioritizes metrics."}
+                    {index === 2 &&
+                      "We rewrite achievements and queue final themes."}
+                    {index === 3 && "Review tailored PDFs before downloading."}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-white/70">
+            <p className="font-semibold text-white">
+              Results recruiters notice
+            </p>
+            <p>
+              Each step keeps the focus on measurable impact, relevant skills,
+              and ATS keyword density so your resume earns more callbacks.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface PreviewViewProps {
+  resumes: GeneratedResume[];
+  onDownload: (theme: string, id: string) => void;
+  downloadingTheme: string | null;
+  onRestart: () => void;
+}
+
+function PreviewView({
+  resumes,
+  onDownload,
+  downloadingTheme,
+  onRestart,
+}: PreviewViewProps) {
+  return (
+    <section className="space-y-10">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/60">
+            Tailored resumes ready
+          </p>
+          <h2 className="text-3xl font-semibold text-white">
+            Preview every optimized PDF
+          </h2>
+          <p className="text-white/60">
+            Compare themes, confirm the details, and download what you need.
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          onClick={onRestart}
+          className="text-white/70 hover:text-white"
+        >
+          Tailor another role
+        </Button>
+      </div>
+
+      <div className="rounded-4xl border border-emerald-400/30 bg-linear-to-br from-emerald-500/10 via-transparent to-indigo-500/10 p-8">
+        <div className="space-y-2 text-center">
+          <CheckCircle2 className="mx-auto size-10 text-emerald-300" />
+          <h3 className="text-2xl font-semibold text-white">
+            Resume set is ready
+          </h3>
+          <p className="text-white/70">
+            Review the wording, quantify the wins, and confirm formatting on
+            each tailored PDF before you export it.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-8 xl:grid-cols-3">
+          {resumes.map((resume) => (
+            <div
+              key={resume.theme}
+              className="rounded-[28px] border border-white/10 bg-black/30 p-4 shadow-2xl shadow-black/40"
+            >
+              <div className="h-[420px] w-full overflow-hidden rounded-2xl border border-white/5 bg-white">
+                <PDFPreview pdfUrl={resume.pdfUrl} />
+              </div>
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-semibold capitalize text-white">
+                    {resume.label}
+                  </p>
+                  <span className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-wide text-white/60">
+                    Theme
+                  </span>
+                </div>
+                <Button
+                  onClick={() => onDownload(resume.theme, resume.id)}
+                  disabled={downloadingTheme === resume.theme}
+                  className="flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-3 text-white hover:bg-white/20"
+                >
+                  {downloadingTheme === resume.theme ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Download className="size-4" />
+                  )}
+                  {downloadingTheme === resume.theme
+                    ? "Preparing download"
+                    : "Download PDF"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BackgroundAurora() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-purple-500/20 blur-[140px]" />
+      <div className="absolute bottom-0 left-0 h-[480px] w-[480px] bg-emerald-500/10 blur-[120px]" />
+      <div className="absolute bottom-20 right-0 h-[420px] w-[420px] bg-indigo-500/10 blur-[140px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_60%)]" />
+      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
     </div>
   );
 }

@@ -475,9 +475,8 @@ function LandingView({ onStart }: { onStart: () => void }) {
           AI resume tailoring
         </div>
         <div className="space-y-6">
-          <h1 className="text-4xl font-semibold leading-tight text-white md:text-6xl">
-            Tailor every resume to fit.
-            <span className="block text-transparent">&nbsp;</span>
+          <h1 className="flex gap-2 flex-col text-4xl font-semibold leading-tight text-white md:text-6xl">
+            <span>Tailor every resume to fit.</span>
             <span className="bg-linear-to-r from-indigo-300 via-purple-200 to-emerald-200 bg-clip-text text-transparent">
               Upload once, match any role.
             </span>
@@ -497,9 +496,6 @@ function LandingView({ onStart }: { onStart: () => void }) {
             Begin tailoring
             <ArrowRight className="ml-2 size-5 transition group-hover:translate-x-1" />
           </Button>
-          <div className="rounded-full border border-white/10 px-6 py-3 text-sm text-white/70">
-            Upload resume + job goals
-          </div>
         </div>
       </div>
 

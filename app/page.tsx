@@ -480,7 +480,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-10">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 md:px-6">
         <div className="w-full max-w-6xl">
           {stage === "landing" && (
             <LandingView onStart={() => setStage("form")} />
@@ -535,7 +535,7 @@ function LandingView({ onStart }: { onStart: () => void }) {
   ];
 
   return (
-    <section className="relative flex flex-col gap-16 overflow-hidden rounded-4xl border border-white/5 bg-linear-to-b from-white/5 to-transparent px-8 py-16 shadow-[0_20px_120px_-60px_rgba(79,70,229,0.6)]">
+    <section className="relative flex flex-col gap-16 overflow-hidden rounded-3xl md:rounded-4xl border border-white/5 bg-linear-to-b from-white/5 to-transparent px-4 py-10 md:px-8 md:py-16 shadow-[0_20px_120px_-60px_rgba(79,70,229,0.6)]">
       <div className="flex flex-col gap-8 text-center">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
           <Stars className="size-4 text-emerald-300" />
@@ -639,7 +639,7 @@ function FormView({
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-white/5 bg-white/5 text-white">
-          <CardContent className="space-y-6 p-8">
+          <CardContent className="space-y-6 p-4 md:p-8">
             <form onSubmit={onSubmit} className="space-y-6">
               <div className="space-y-3">
                 <Label
@@ -706,7 +706,7 @@ function FormView({
           </CardContent>
         </Card>
 
-        <div className="space-y-6 rounded-[28px] border border-white/5 bg-linear-to-b from-white/10 to-white/5 p-8">
+        <div className="space-y-6 rounded-[28px] border border-white/5 bg-linear-to-b from-white/10 to-white/5 p-4 md:p-8">
           <p className="text-sm uppercase tracking-[0.4em] text-white/50">
             What we tailor
           </p>
@@ -781,7 +781,7 @@ function PreviewView({
         </Button>
       </div>
 
-      <div className="rounded-4xl border border-emerald-400/30 bg-linear-to-br from-emerald-500/10 via-transparent to-indigo-500/10 p-8">
+      <div className="rounded-3xl md:rounded-4xl border border-emerald-400/30 bg-linear-to-br from-emerald-500/10 via-transparent to-indigo-500/10 p-4 md:p-8">
         <div className="space-y-2 text-center">
           <CheckCircle2 className="mx-auto size-10 text-emerald-300" />
           <h3 className="text-2xl font-semibold text-white">
@@ -793,7 +793,7 @@ function PreviewView({
           </p>
         </div>
 
-        <div className="mt-10 grid gap-8 xl:grid-cols-3">
+        <div className="mt-10 grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {resumes.map((resume) => (
             <div
               key={resume.theme}

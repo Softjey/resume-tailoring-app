@@ -58,6 +58,9 @@ export function PDFPreview({ pdfUrl }: PDFPreviewProps) {
 
       <div
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
           width: "794px", // A4 width
           height: "1123px", // A4 height
           transform: `scale(${scale})`,

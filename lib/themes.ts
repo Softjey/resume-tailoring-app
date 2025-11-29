@@ -55,6 +55,38 @@ export async function renderTheme(themeName: string, resume: any) {
   // Decode HTML entities in the resume data before rendering
   const cleanResume = decodeResumeData(resume);
 
+  // Sanitize data to prevent common theme errors
+  if (!cleanResume.basics) {
+    cleanResume.basics = {};
+  }
+  if (!cleanResume.basics.location) {
+    cleanResume.basics.location = {};
+  }
+
+  // Remove empty date strings which can cause RangeError: Invalid time value in some themes
+  const dateFields = ["startDate", "endDate", "date", "releaseDate"];
+  const collections = [
+    "work",
+    "education",
+    "volunteer",
+    "awards",
+    "certificates",
+    "publications",
+    "projects",
+  ];
+
+  collections.forEach((collection) => {
+    if (Array.isArray(cleanResume[collection])) {
+      cleanResume[collection].forEach((item: any) => {
+        dateFields.forEach((field) => {
+          if (item[field] === "") {
+            delete item[field];
+          }
+        });
+      });
+    }
+  });
+
   let themeModule;
   try {
     switch (themeName) {
